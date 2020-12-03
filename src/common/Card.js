@@ -1,4 +1,4 @@
-const { FlexLayout } = require("../common/utils");
+const { FlexLayout, encodeHTML } = require("../common/utils");
 const { getAnimations } = require("../getStyles");
 
 class Card {
@@ -6,7 +6,8 @@ class Card {
     width = 100,
     height = 100,
     colors = {},
-    title = "",
+    customTitle,
+    defaultTitle = "",
     titlePrefixIcon,
   }) {
     this.width = width;
@@ -17,7 +18,11 @@ class Card {
 
     // returns theme based colors with proper overrides and defaults
     this.colors = colors;
-    this.title = title;
+    this.title =
+      customTitle !== undefined
+        ? encodeHTML(customTitle)
+        : encodeHTML(defaultTitle);
+
     this.css = "";
 
     this.paddingX = 25;
@@ -85,6 +90,27 @@ class Card {
     `;
   }
 
+  renderGradient() {
+    if (typeof this.colors.bgColor !== "object") return;
+
+    const gradients = this.colors.bgColor.slice(1);
+    return typeof this.colors.bgColor === "object"
+      ? `
+        <defs>
+          <linearGradient
+            id="gradient" 
+            gradientTransform="rotate(${this.colors.bgColor[0]})"
+          >
+            ${gradients.map((grad, index) => {
+              let offset = (index * 100) / (gradients.length - 1);
+              return `<stop offset="${offset}%" stop-color="#${grad}" />`;
+            })}
+          </linearGradient>
+        </defs>
+        `
+      : "";
+  }
+
   render(body) {
     return `
       <svg
@@ -102,12 +128,15 @@ class Card {
           }
           ${this.css}
 
+          ${process.env.NODE_ENV === "test" ? "" : getAnimations()}
           ${
-            process.env.NODE_ENV === "test" || !this.animations
-              ? ""
-              : getAnimations()
+            this.animations === false
+              ? `* { animation-duration: 0s !important; animation-delay: 0s !important; }`
+              : ""
           }
         </style>
+
+        ${this.renderGradient()}
 
         <rect
           data-testid="card-bg"
@@ -117,7 +146,11 @@ class Card {
           height="99%"
           stroke="#E4E2E2"
           width="${this.width - 1}"
-          fill="${this.colors.bgColor}"
+          fill="${
+            typeof this.colors.bgColor === "object"
+              ? "url(#gradient)"
+              : this.colors.bgColor
+          }"
           stroke-opacity="${this.hideBorder ? 0 : 1}"
         />
 
